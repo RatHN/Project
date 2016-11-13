@@ -62,11 +62,10 @@ public:
         return inst;
     };
 
-
+    bool begin();
+    
     void resetModule();
-    
-    
-    
+      
     /** initialize GPRS module including SIM card check & signal strength
      *  @return true if connected, false otherwise
      */

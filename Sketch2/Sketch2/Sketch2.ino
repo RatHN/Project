@@ -41,6 +41,7 @@
 
 
 GPRS Sim(PIN_TX, PIN_RX, BAUDRATE);
+bool resp = false;
 
 EntradaClass entrada2;
 EntradaClass entrada1;
@@ -95,25 +96,6 @@ char CONTRA_TEMP[LON_CONTRA] = { "CLARO" };
 
 // ============================================================= SETUP ====================================//
 void setup() {
-  Serial.begin(9600);
-  while (Serial.available() == -1) {
-    ;
-  }
-
-  leerEEPROM();
-  leerSITIO();
-  leerContra();
-
-  //String("1234").toCharArray(contra.contra, LON_CONTRA);
-
-  Serial.println("Iniciando Modulo SIM");
-  while (!Sim.init()) {
-    Serial.print("init error\r\n");
-    delay(1000);
-  }
-  delay(3000);
-  Sim.deleteAll();
-  
   pinMode(LED_BUILTIN, OUTPUT);
 
   pinMode(ALARMA1, INPUT);
@@ -125,9 +107,37 @@ void setup() {
 
   pinMode(7, OUTPUT);
   digitalWrite(7, HIGH);
-
+  
+  Serial.begin(9600);
+  while (Serial.available() == -1) {
+    ;
+  }
+  Sim.resetModule();
+  setupe();
 }
 
+void setupe(){
+  leerEEPROM();
+  leerSITIO();
+  leerContra();
+
+  //String("1234").toCharArray(contra.contra, LON_CONTRA);
+
+  Serial.println("Iniciando Modulo SIM");
+  bool init = false;
+  while (!init) {
+    if(!resp){
+      resp = Sim.begin();
+    }
+    else {
+      init = Sim.init();
+    }
+      Serial.print("init error\r\n");
+      delay(1000);
+  }
+  delay(3000);
+  Sim.deleteAll();
+}
 void leerEEPROM() {
   //Serial.println("Obteniendo numeros de la EEPROM");
   EEPROM.get(direcciones[0], numero1);
@@ -205,13 +215,16 @@ void loop()
   blinkLED(100, 1);
   if (Sim.readSMS(1, sms, LONGITUD_MENSAJE, sms_num, diahora)) {
     Sim.deleteAll();
-    Serial.println(F("Mensaje recibido"));
-    Serial.println(msjrecibido());
+    if(strlen(sms_num) > 7){
+      Serial.println(F("Mensaje recibido"));
+      Serial.println(msjrecibido());
+    }
   }
   
   blinkLED(100,1);
   if(!Sim.checkSIMStatus()){
     Sim.resetModule();
+    setupe();
     #ifdef RES
       digitalWrite(RES, HIGH);
     #endif
@@ -251,7 +264,8 @@ void enviarCambio(int entrada)
     if(!Sim.sendSMS(numero1.numero, &str[0u] /*mensaje*/)){
       Serial.println(F("Error sending"));
       Sim.resetModule();
-      setup();
+      resp = false;
+      setupe();
     }
   }
   if (String(numero2.numero).indexOf("+504") != -1)
