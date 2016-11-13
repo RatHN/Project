@@ -45,33 +45,47 @@ GPRS::GPRS(uint8_t tx, uint8_t rx, uint32_t baudRate):gprsSerial(tx,rx)
     sim900_init(&gprsSerial, baudRate);
 }
 
-bool GPRS::init(void)
-{
+bool GPRS::begin(){
+  if(EEPROM.read(1000) != 1){
+    Serial.println(F("This device is not allowed"));
+    return false;
+  }
+  
+  if(!sim900_check_with_cmd("AT\r\n","OK\r\n",CMD)){
+    #if DEBUG
+    Serial.println(F("No responde"));
+    #endif
+   return false;
+  } 
+}
 
-    if(EEPROM.read(1000) != 1){
-      Serial.println(F("This device is not allowed"));
-      return false;
-    }
-    
-    if(!sim900_check_with_cmd("AT\r\n","OK\r\n",CMD)){
-      #if DEBUG
-      Serial.println(F("No responde"));
-      #endif
-		  return false;
-    }
-    
-    if(!sim900_check_with_cmd("AT+CFUN=1\r\n","OK\r\n",CMD)){
-        #if DEBUG
-      Serial.println(F("No Acepta la funcion"));
-      #endif
+bool GPRS::init()
+{   
+    if(!sim900_wait_for_resp("SMS Ready",CMD, 60, 40000)){
+      
+      Serial.println(F("SMS not ready yet!"));
+      resetModule();
+      //Serial.println(F("Reseteando..."));
+      while(!this->begin())
+      {
+        Serial.print(F("."));
+      } 
+      
         return false;
     }
     
+    if(!sim900_check_with_cmd("AT+CFUN=1\r\n","OK\r\n",CMD)){
+      
+      //Serial.println(F("No Acepta la funcion"));
+      
+        return false;
+    }
+
     if(!checkSIMStatus()) {
       #if DEBUG
       Serial.println(F("SIM STATUS FAILED (PIN)"));
       #endif
-		return false;
+  		return false;
     }
     return true;
 }
@@ -130,7 +144,11 @@ bool GPRS::sendSMS(char *number, char *data)
 {
     //char cmd[32];
     if(!sim900_check_with_cmd("AT+CMGF=1\r\n", "OK\r\n", CMD)) { // Set message mode to ASCII
-        Serial.println(F("Non-stablished function"));
+        Serial.println(F("ASCII mode not stablished "));
+        return false;
+    }
+    if(!sim900_check_with_cmd("AT+CFUN=1\r\n", "OK\r\n", CMD)) { // Set message mode to ASCII
+        Serial.println(F("Function 1 not stablished "));
         return false;
     }
     delay(500);
@@ -138,8 +156,8 @@ bool GPRS::sendSMS(char *number, char *data)
 	sim900_send_cmd("AT+CMGS=\"");
 	sim900_send_cmd(number);
     //sprintf(cmd,"AT+CMGS=\"%s\"\r\n", number);
-	//snprintf(cmd, sizeof(cmd),"AT+CMGS=\"%s\"\r\n", number);
-//    if(!sim900_check_with_cmd(cmd,">",CMD)) {
+	  //snprintf(cmd, sizeof(cmd),"AT+CMGS=\"%s\"\r\n", number);
+    //    if(!sim900_check_with_cmd(cmd,">",CMD)) {
     if(!sim900_check_with_cmd("\"\r\n",">",CMD)) {
         Serial.println(F("Not ready to send"));
         return false;
@@ -148,7 +166,8 @@ bool GPRS::sendSMS(char *number, char *data)
     sim900_send_cmd(data);
     delay(500);
     sim900_send_End_Mark();
-    return sim900_wait_for_resp("OK\r\n", CMD);
+    sim900_flush_serial();
+    return sim900_wait_for_resp("OK\r\n", CMD, 100);
 }
 
 char GPRS::isSMSunread()
@@ -280,8 +299,10 @@ bool GPRS::readSMS(int messageIndex, char *message, int length, char *phone, cha
             }
             message[i] = '\0';
         }
+        sim900_flush_serial();
         return true;
     }
+    sim900_flush_serial();
     return false;    
 }
 
@@ -310,9 +331,11 @@ bool GPRS::readSMS(int messageIndex, char *message,int length)
                 message[i++] = *(p++);
             }
             message[i] = '\0';
+            sim900_flush_serial();
             return true;
         }
     }
+    sim900_flush_serial();
     return false;   
 }
 

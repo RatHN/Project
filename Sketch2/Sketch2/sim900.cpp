@@ -160,21 +160,36 @@ boolean sim900_wait_for_resp(const char* resp, DataType type, unsigned int timeo
 {
     int len = strlen(resp);
     int sum = 0;
+//    int higher = 0;
+//    int total = 0;
     unsigned long timerStart, prevChar;    //prevChar is the time when the previous Char has been read.
     timerStart = millis();
     prevChar = 0;
     while(1) {
         if(sim900_check_readable()) {
-            char c = serialSIM900->read();
-            prevChar = millis();
-            sum = (c==resp[sum]) ? sum+1 : 0;
-            if(sum == len)break;
+            char c = serialSIM900->read();      //Tomo caracter
+            Serial.print(c);
+            prevChar = millis();                //Tomo el tiempo
+//            higher = (sum > higher) ? sum : higher;
+//            total++;
+            sum = (c==resp[sum]) ? sum+1 : 0;   //Si el ultimo caracter es igual al indice 'sum' de 'resp', entonces sum+=1, sino es igual a 0
+            if(sum == len)break;                    //Si sum es igual a la longitud de la respuesta esperada, salir.
         }
         if ((unsigned long) (millis() - timerStart) > timeout * 1000UL) {
+          Serial.println(F("timeout1!"));
+//          Serial.println(len);
+//          Serial.println(sum);
+//          Serial.println(higher);
+//          Serial.println(total);
             return false;
         }
         //If interchar Timeout => return FALSE. So we can return sooner from this function.
         if (((unsigned long) (millis() - prevChar) > chartimeout) && (prevChar != 0)) {
+          Serial.println(F("timeout2!"));
+//          Serial.println(len);
+//          Serial.println(sum);
+//          Serial.println(higher);
+//          Serial.println(total);
             return false;
         }
 
